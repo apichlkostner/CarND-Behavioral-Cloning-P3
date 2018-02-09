@@ -16,56 +16,116 @@ def process_image(img):
 #        augmented_images.append(cv2.flip(image, 1))
 #        augmented_measurements.append(measurement * -1.0)
 
-def driveGenerator():
-    df = pd.read_csv('data_06_corrections/driving_log.csv')
-    batch_size = 32
+class DriveImageGenerator:
+    augment_mult = 2
 
-    X_train = np.zeros([batch_size * 3, 160, 320, 3])
-    y_train = np.zeros([batch_size * 3])
+    def __init__(self):
+        self.df_train = None
+        self.df_valid = None
+        self.len_train = 0
+        self.len_valid = 0
+        self.val_split = 0.0
+        self.batch_size = 0
 
-    nr_data = df.shape[0]
+    def fit(self, df_filename='data/driving_log.csv', batch_size=32, val_split=0.2):
+        df = pd.read_csv(df_filename, header=None)
+        df.columns = ['center', 'left', 'right', 'steering', 'a', 'b', 'c']
 
-    print(nr_data)
+        # split data in center, left and right images
+        dfc = df[['center', 'steering']].copy()
+        dfl = df[['left', 'steering']].copy()
+        dfr = df[['right', 'steering']].copy()
 
-    cnt = 0
+        # create adjusted steering measurements for the side camera images
+        correction = 0.3
+        dfl['steering'] += correction
+        dfr['steering'] -= correction
 
-    while 1:
-        df.sample(frac=1).reset_index(drop=True)
+        dfc.columns = ['image', 'steering']
+        dfl.columns = ['image', 'steering']
+        dfr.columns = ['image', 'steering']
 
-        for i in range(int(nr_data / batch_size)):
-            cnt += 1
-            for j in range(batch_size):
-                row = df.iloc[i * batch_size + j]
+        # append all images to one big data frame
+        dfn = dfc.append(dfl).append(dfr)
+
+        print(dfc.iloc[0]['image'])
+        print(dfl.iloc[0]['image'])
+        print(dfr.iloc[0]['image'])
+        print("Dataframe size = " + str(dfn.shape))
+        
+        # random shuffle
+        dfn.sample(frac=1).reset_index(drop=True)
+
+        # train / validation split
+        pos_split = int(val_split * dfn.shape[0])
+
+        self.df_train = dfn[pos_split:]
+        self.df_valid = dfn[0:pos_split]
+        
+        self.len_train = self.df_train.shape[0]
+        self.len_valid = self.df_valid.shape[0]
+
+
+    def flow_train(self):
+        X_train = np.zeros([batch_size, 160, 320, 3])
+        y_train = np.zeros([batch_size])
+
+        cnt = 0
+        self.batch_size = batch_size
+
+        while 1:
+            # random shuffle of train set
+            self.df_train.sample(frac=1).reset_index(drop=True)
+
+            for i in range(int(self.len_train / batch_size)):
+                cnt += 1
+                for j in range(batch_size):
+                    row = self.df_train.iloc[i * batch_size + j]
+                    
+                    steering = float(row['steering'])
+
+                    # simple data augmentation: flip images and steering angle
+                    if cnt % 2 == 0:
+                        img = process_image(np.asarray(cv2.imread(row['image'])))
+                        X_train[j] = np.asarray(img)
+                        y_train[j] = steering
+                    else:
+                        img = process_image(np.asarray(cv2.flip(cv2.imread(row['image']), 1)))
+                        X_train[j] = np.asarray(img)
+                        y_train[j] = steering * -1.0
                 
-                steering_center = float(row[3])
+                yield (X_train, y_train)
 
-                # create adjusted steering measurements for the side camera images
-                correction = 0.3
-                steering_left = steering_center + correction
-                steering_right = steering_center - correction
+    def flow_valid(self):
+        X_train = np.zeros([batch_size, 160, 320, 3])
+        y_train = np.zeros([batch_size])
 
-                if cnt % 2 == 0:
-                    img_center = process_image(np.asarray(cv2.imread(row[0])))
-                    img_left = process_image(np.asarray(cv2.flip(cv2.imread(row[1]), 1)))
-                    img_right = process_image(np.asarray(cv2.imread(row[2])))
-                    X_train[j*3] = np.asarray(img_center)
-                    y_train[j*3] = steering_center
-                    X_train[j*3+1] = np.asarray(img_left)
-                    y_train[j*3+1] = steering_left * -1.0
-                    X_train[j*3+2] = np.asarray(img_right)
-                    y_train[j*3+2] = steering_right
-                else:
-                    img_center = process_image(np.asarray(cv2.flip(cv2.imread(row[0]), 1)))
-                    img_left = process_image(np.asarray(cv2.imread(row[1])))
-                    img_right = process_image(np.asarray(cv2.flip(cv2.imread(row[2]), 1)))
-                    X_train[j*3] = np.asarray(img_center)
-                    y_train[j*3] = steering_center * -1.0
-                    X_train[j*3+1] = np.asarray(img_left)
-                    y_train[j*3+1] = steering_left
-                    X_train[j*3+2] = np.asarray(img_right)
-                    y_train[j*3+2] = steering_right * -1.0
-            
-            yield (X_train, y_train)
+        cnt = 0
+
+        while 1:
+            # random shuffle of train set
+            self.df_valid.sample(frac=1).reset_index(drop=True)
+
+            for i in range(int(self.len_valid / batch_size)):
+                cnt += 1
+                for j in range(batch_size):
+                    row = self.df_valid.iloc[i * batch_size + j]
+                    
+                    steering = float(row['steering'])
+
+                    if cnt % 2 == 0:
+                        img = process_image(np.asarray(cv2.imread(row['image'])))
+                        X_train[j] = np.asarray(img)
+                        y_train[j] = steering
+                    else:
+                        img = process_image(np.asarray(cv2.flip(cv2.imread(row['image']), 1)))
+                        X_train[j] = np.asarray(img)
+                        y_train[j] = steering * -1.0
+                
+                yield (X_train, y_train)
+
+    def num_samples(self):
+        return [self.len_train * self.augment_mult, self.len_valid * self.augment_mult]
 
 
 from keras.models import Sequential
@@ -93,7 +153,16 @@ model.add(Dense(1))
 
 model.compile(loss='mse', optimizer='adam')
 
-model.fit_generator(driveGenerator(), steps_per_epoch = 340, epochs = 1, callbacks=[], validation_data=None)
-#model.fit(X_train, y_train, validation_split=0.2, shuffle=True, epochs=2)
+batch_size = 64
+
+dg = DriveImageGenerator()
+dg.fit(df_filename = 'data_06_corrections/driving_log.csv', batch_size = batch_size)
+print("Anzahl smaples" + str(dg.num_samples()))
+steps_train = int((dg.num_samples())[0] / batch_size) + 1
+steps_valid = int((dg.num_samples())[1] / batch_size) + 1
+
+model.fit_generator(dg.flow_train(), steps_per_epoch = steps_train, 
+                    validation_data=dg.flow_valid(), validation_steps=steps_valid,
+                    epochs = 1, callbacks=[])
 
 model.save('model12.h5')
