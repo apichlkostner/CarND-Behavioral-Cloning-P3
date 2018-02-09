@@ -3,18 +3,9 @@ import cv2
 import numpy as np
 import pandas as pd
 
-lines = []
-images = []
-measurements = []
-
 def process_image(img):
-    return img
+    return cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
 
-#    for image, measurement in zip(car_images, steering_angles):
-#        augmented_images.append(image)
-#        augmented_measurements.append(measurement)
-#        augmented_images.append(cv2.flip(image, 1))
-#        augmented_measurements.append(measurement * -1.0)
 
 class DriveImageGenerator:
     augment_mult = 2
@@ -37,7 +28,7 @@ class DriveImageGenerator:
         dfr = df[['right', 'steering']].copy()
 
         # create adjusted steering measurements for the side camera images
-        correction = 0.3
+        correction = 0.25
         dfl['steering'] += correction
         dfr['steering'] -= correction
 
@@ -48,9 +39,9 @@ class DriveImageGenerator:
         # append all images to one big data frame
         dfn = dfc.append(dfl).append(dfr)
 
-        print(dfc.iloc[0]['image'])
-        print(dfl.iloc[0]['image'])
-        print(dfr.iloc[0]['image'])
+        print(dfc.iloc[0])
+        print(dfl.iloc[0])
+        print(dfr.iloc[0])
         print("Dataframe size = " + str(dfn.shape))
         
         # random shuffle
@@ -75,17 +66,20 @@ class DriveImageGenerator:
 
         while 1:
             # random shuffle of train set
-            self.df_train.sample(frac=1).reset_index(drop=True)
+            df_train = self.df_train.sample(frac=1).reset_index(drop=True)
 
             for i in range(int(self.len_train / batch_size)):
-                cnt += 1
                 for j in range(batch_size):
-                    row = self.df_train.iloc[i * batch_size + j]
+                    row = df_train.iloc[i * batch_size + j]
                     
                     steering = float(row['steering'])
 
+                    #print(steering)
+
+                    aug_technique = np.random.randint(0, 2)
+
                     # simple data augmentation: flip images and steering angle
-                    if cnt % 2 == 0:
+                    if aug_technique == 0:
                         img = process_image(np.asarray(cv2.imread(row['image'])))
                         X_train[j] = np.asarray(img)
                         y_train[j] = steering
@@ -104,12 +98,12 @@ class DriveImageGenerator:
 
         while 1:
             # random shuffle of train set
-            self.df_valid.sample(frac=1).reset_index(drop=True)
+            df_valid = self.df_valid.sample(frac=1).reset_index(drop=True)
 
             for i in range(int(self.len_valid / batch_size)):
                 cnt += 1
                 for j in range(batch_size):
-                    row = self.df_valid.iloc[i * batch_size + j]
+                    row = df_valid.iloc[i * batch_size + j]
                     
                     steering = float(row['steering'])
 
@@ -156,13 +150,14 @@ model.compile(loss='mse', optimizer='adam')
 batch_size = 64
 
 dg = DriveImageGenerator()
-dg.fit(df_filename = 'data_06_corrections/driving_log.csv', batch_size = batch_size)
+#dg.fit(df_filename = 'data_06_corrections/driving_log.csv', batch_size = batch_size)
+dg.fit(batch_size = batch_size)
 print("Anzahl smaples" + str(dg.num_samples()))
 steps_train = int((dg.num_samples())[0] / batch_size) + 1
 steps_valid = int((dg.num_samples())[1] / batch_size) + 1
 
 model.fit_generator(dg.flow_train(), steps_per_epoch = steps_train, 
                     validation_data=dg.flow_valid(), validation_steps=steps_valid,
-                    epochs = 1, callbacks=[])
+                    epochs = 2, callbacks=[])
 
-model.save('model12.h5')
+model.save('model15.h5')
