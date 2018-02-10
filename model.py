@@ -12,7 +12,7 @@ class DriveImageGenerator:
 
     def __init__(self):
         self.df_drive = {'train': None, 'valid': None}
-        self.len = {'train': 0, 'valid': 0}
+        self.num_samples = {'train': 0, 'valid': 0}
         self.val_split = 0.0
         self.batch_size = 0
 
@@ -29,7 +29,7 @@ class DriveImageGenerator:
         dfr = df[['right', 'steering']].copy()
 
         # create adjusted steering measurements for the side camera images
-        correction = 0.19
+        correction = 0.23
         dfl['steering'] += correction
         dfr['steering'] -= correction
 
@@ -51,7 +51,8 @@ class DriveImageGenerator:
         self.df_drive['train'] = dfn[pos_split:]
         self.df_drive['valid'] = dfn[0:pos_split]
         
-        self.len = {'train': self.df_drive['train'].shape[0], 'valid': self.df_drive['valid'].shape[0]}
+        self.num_samples = {'train': self.df_drive['train'].shape[0], 'valid': self.df_drive['valid'].shape[0]}
+        print('Number of samples: ' + str(self.num_samples))
 
     def flow(self, data_set_name):
         X_data = np.zeros([batch_size, 160, 320, 3])
@@ -63,7 +64,7 @@ class DriveImageGenerator:
             # random shuffle of train set
             df_drive = self.df_drive[data_set_name].sample(frac=1).reset_index(drop=True)
 
-            for i in range(int(self.len[data_set_name] / batch_size)):
+            for i in range(int(self.num_samples[data_set_name] / batch_size)):
                 for j in range(batch_size):
                     row = df_drive.iloc[i * batch_size + j]
                     
@@ -85,12 +86,13 @@ class DriveImageGenerator:
                 
                 yield (X_data, y_data)
 
-    def num_samples(self, data_set_name):
-        return self.len[data_set_name] * self.augment_mult
+    def get_num_samples(self, data_set_name):
+        return self.num_samples[data_set_name] * self.augment_mult
 
 
 from keras.models import Sequential
 from keras.layers import Flatten, Dense, Conv2D, Dropout, Lambda, MaxPooling2D, Cropping2D
+from keras.callbacks import ModelCheckpoint, EarlyStopping
 
 model = Sequential()
 model.add(Lambda(lambda x: (x / 255.0) - 0.5, input_shape=(160,320,3)))
@@ -117,15 +119,24 @@ model.compile(loss='mse', optimizer='adam')
 batch_size = 64
 
 dg = DriveImageGenerator()
-#dg.fit(df_filename = 'data_06_corrections/driving_log.csv', batch_size = batch_size)
+
+# log files for track 1 and track 2
 df_filenames = ['~/data_track_1/driving_log.csv', '~/data_track_2/driving_log.csv']
+
+# preprocessing of log files
 dg.fit(df_filenames=df_filenames, batch_size = batch_size)
 
-steps_train = int((dg.num_samples('train')) / batch_size) + 1
-steps_valid = int((dg.num_samples('valid')) / batch_size) + 1
+steps_train = int((dg.get_num_samples('train')) / batch_size) + 1
+steps_valid = int((dg.get_num_samples('valid')) / batch_size) + 1
 
+# safe model checkpoints
+modelCheckPoint = ModelCheckpoint('model_03_{epoch:02d}-{val_loss:.4f}.hdf5', monitor='val_loss', verbose=0, save_best_only=True)
+# stop training when validation loss is not decreasing
+earlyStopping = EarlyStopping(monitor='val_loss', min_delta=0, patience=2)
+
+callbacks = [modelCheckPoint, earlyStopping]
+
+# fit model
 model.fit_generator(dg.flow('train'), steps_per_epoch = steps_train, 
                     validation_data=dg.flow('valid'), validation_steps=steps_valid,
-                    epochs = 3, callbacks=[])
-
-model.save('model_track_1_and_2_01_driving.h5')
+                    epochs = 10, callbacks=callbacks)
