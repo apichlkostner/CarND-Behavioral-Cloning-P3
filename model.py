@@ -19,37 +19,46 @@ class DriveImageGenerator:
     def fit(self, df_filenames=['~/data_track_1/driving_log.csv'], batch_size=32, val_split=0.2):
         df = pd.DataFrame()
         for df_filename in df_filenames:
-            df = df.append(pd.read_csv(df_filename, header=None))
+            # read first log
+            temp_df = pd.read_csv(df_filename, header=None)
 
-        df.columns = ['center', 'left', 'right', 'steering', 'a', 'b', 'c']
+            # add column names
+            temp_df.columns = ['center', 'left', 'right', 'steering', 'a', 'b', 'c']
 
-        # split data in center, left and right images
-        dfc = df[['center', 'steering']].copy()
-        dfl = df[['left', 'steering']].copy()
-        dfr = df[['right', 'steering']].copy()
+            # split data in center, left and right images
+            temp_df_center = temp_df[['center', 'steering']].copy()
+            temp_df_left = temp_df[['left', 'steering']].copy()
+            temp_df_right =temp_df[['right', 'steering']].copy()
 
-        # create adjusted steering measurements for the side camera images
-        correction = 0.23
-        dfl['steering'] += correction
-        dfr['steering'] -= correction
+            # create adjusted steering measurements for the side camera images
+            # track 2 needs larger value than track 1
+            if df_filename.find('track_1') != -1:
+                correction = 0.19
+            else:
+                correction = 0.4
 
-        dfc.columns = ['image', 'steering']
-        dfl.columns = ['image', 'steering']
-        dfr.columns = ['image', 'steering']
+            print('Correction = ' + str(correction))
 
-        # append all images to one big data frame
-        dfn = dfc.append(dfl).append(dfr)
+            temp_df_left['steering'] += correction
+            temp_df_right['steering'] -= correction
 
-        print("Dataframe size = " + str(dfn.shape))
+            temp_df_center.columns = ['image', 'steering']
+            temp_df_left.columns = ['image', 'steering']
+            temp_df_right.columns = ['image', 'steering']
+
+            # append all images to one big data frame
+            df = df.append(temp_df_center).append(temp_df_left).append(temp_df_right)
+
+        print("Dataframe size = " + str(df.shape))
         
         # random shuffle
-        dfn.sample(frac=1).reset_index(drop=True)
+        df = df.sample(frac=1).reset_index(drop=True)
 
         # train / validation split
-        pos_split = int(val_split * dfn.shape[0])
+        pos_split = int(val_split * df.shape[0])
 
-        self.df_drive['train'] = dfn[pos_split:]
-        self.df_drive['valid'] = dfn[0:pos_split]
+        self.df_drive['train'] = df[pos_split:]
+        self.df_drive['valid'] = df[0:pos_split]
         
         self.num_samples = {'train': self.df_drive['train'].shape[0], 'valid': self.df_drive['valid'].shape[0]}
         print('Number of samples: ' + str(self.num_samples))
@@ -121,7 +130,7 @@ batch_size = 64
 dg = DriveImageGenerator()
 
 # log files for track 1 and track 2
-df_filenames = ['~/data_track_1/driving_log.csv', '~/data_track_2/driving_log.csv']
+df_filenames = ['~/data_track_1/driving_log.csv', '~/data_track_1_2/driving_log.csv', '~/data_track_2_2/driving_log.csv']
 
 # preprocessing of log files
 dg.fit(df_filenames=df_filenames, batch_size = batch_size)
@@ -130,7 +139,7 @@ steps_train = int((dg.get_num_samples('train')) / batch_size) + 1
 steps_valid = int((dg.get_num_samples('valid')) / batch_size) + 1
 
 # safe model checkpoints
-modelCheckPoint = ModelCheckpoint('model_03_{epoch:02d}-{val_loss:.4f}.hdf5', monitor='val_loss', verbose=0, save_best_only=True)
+modelCheckPoint = ModelCheckpoint('model_10_{epoch:02d}-{val_loss:.4f}.hdf5', monitor='val_loss', verbose=0, save_best_only=True)
 # stop training when validation loss is not decreasing
 earlyStopping = EarlyStopping(monitor='val_loss', min_delta=0, patience=2)
 
@@ -139,4 +148,4 @@ callbacks = [modelCheckPoint, earlyStopping]
 # fit model
 model.fit_generator(dg.flow('train'), steps_per_epoch = steps_train, 
                     validation_data=dg.flow('valid'), validation_steps=steps_valid,
-                    epochs = 10, callbacks=callbacks)
+                    epochs = 5, callbacks=callbacks)
