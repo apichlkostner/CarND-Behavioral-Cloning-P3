@@ -182,12 +182,21 @@ def get_model():
 
 def main():
     from keras.callbacks import ModelCheckpoint, EarlyStopping
+    from keras.models import load_model
     
-    # create model
-    model = get_model()
+    LOAD_MODEL = True
+
+    if LOAD_MODEL:
+        import keras.backend as K
+
+        model = load_model('model_track12_optimal_corr_10_12-0.0793.hdf5')
+        K.set_value(model.optimizer.lr, 1e-04)
+    else:
+        # create model
+        model = get_model()
 
     BATCH_SIZE = 64
-    EPOCHS     = 40
+    EPOCHS     = 120
 
     # reads images from disc and does on the fly augmentation
     dg = DriveImageGenerator()
@@ -198,7 +207,13 @@ def main():
             {'filename': '~/data/track_1/corrections_01/driving_log.csv', 'steeringCorrection': 0.0},
             {'filename': '~/data/track_2/optimal_middle_01/driving_log.csv', 'steeringCorrection': 0.15},
             {'filename': '~/data/track_2/critical_situations_middle_01/driving_log.csv', 'steeringCorrection': 0.0},
-            {'filename': '~/data/track_2/corrections_middle_01/driving_log.csv', 'steeringCorrection': 0.0}
+            {'filename': '~/data/track_2/critical_situations_middle_02/driving_log.csv', 'steeringCorrection': 0.0},
+            {'filename': '~/data/track_2/corrections_middle_01/driving_log.csv', 'steeringCorrection': 0.0},
+            {'filename': '~/data/track_2/corrections_middle_02/driving_log.csv', 'steeringCorrection': 0.0},
+            {'filename': '~/data/track_2/corrections_middle_03/driving_log.csv', 'steeringCorrection': 0.0},
+            {'filename': '~/data/track_2/corrections_middle_03/driving_log.csv', 'steeringCorrection': 0.0},
+            {'filename': '~/data/track_2/corrections_middle_04/driving_log.csv', 'steeringCorrection': 0.0},
+            {'filename': '~/data/track_2/corrections_middle_04/driving_log.csv', 'steeringCorrection': 0.0}
             ]
 
 
@@ -210,10 +225,10 @@ def main():
     steps_valid = int((dg.get_num_samples('valid')) / BATCH_SIZE) + 1
 
     # safe model checkpoints
-    modelCheckPoint = ModelCheckpoint('model_track12_optimal_corr_03_{epoch:02d}-{val_loss:.4f}.hdf5', monitor='val_loss', verbose=0, save_best_only=False)
+    modelCheckPoint = ModelCheckpoint('model_track12_optimal_corr_11_{epoch:02d}-{val_loss:.4f}.hdf5', monitor='val_loss', verbose=0, save_best_only=False)
 
     # stop training when validation loss is not decreasing
-    earlyStopping = EarlyStopping(monitor='val_loss', min_delta=0, patience=5)
+    earlyStopping = EarlyStopping(monitor='val_loss', min_delta=0, patience=30)
 
     # list with callbacks for fit_generator
     callbacks = [modelCheckPoint, earlyStopping]
