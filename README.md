@@ -1,30 +1,42 @@
 # **Behavioral Cloning** 
 
-## Writeup Template
+# DRAFT DRAFT DRAFT
 
-### You can use this file as a template for your writeup if you want to submit it as a markdown file, but feel free to use some other method and submit a pdf if you prefer.
+This document is the writeup for an exercise of an online course.
+
 
 ---
 
-**Behavioral Cloning Project**
+## Summary
 
-The goals / steps of this project are the following:
-* Use the simulator to collect data of good driving behavior
-* Build, a convolution neural network in Keras that predicts steering angles from images
-* Train and validate the model with a training and validation set
-* Test that the model successfully drives around track one without leaving the road
-* Summarize the results with a written report
+The following steps were done:
+* Images and steering angles were obtained by driving in a racing simulator on two tracks
+    * Good trajectories
+    * Corrections from bad trajectories
+* With data augmentation more samples were generated:
+    * Views from a left and a right camera were used
+    * Between the camera views additional image were created by virtually shifting the camera
+* Convolutional neural networks were trained with the data and connected to the simulator to drive the car automatically
+* The driving behavior was analyzed and critical situations were found
+* Extra samples of critical situations were created by driving the simulator manually
+* A good working model was used to drive the simulator and videos of the result were recorded
 
 
 [//]: # (Image References)
 
 [image1]: ./examples/placeholder.png "Model Visualization"
-[image2]: ./examples/placeholder.png "Grayscaling"
-[image3]: ./examples/placeholder_small.png "Recovery Image"
-[image4]: ./examples/placeholder_small.png "Recovery Image"
-[image5]: ./examples/placeholder_small.png "Recovery Image"
-[image6]: ./examples/placeholder_small.png "Normal Image"
-[image7]: ./examples/placeholder_small.png "Flipped Image"
+[image2]: ./images/simulator_manual.jpg "Simulator manual"
+[image3]: ./images/simulator_autonomous.jpg "Simulator autonomous"
+[image4]: ./images/difficult_situation_track1_01.jpg "Difficult situation"
+[image5]: ./images/difficult_situation_track1_02.jpg "Difficult situation"
+[image6]: ./images/difficult_situation_track1_03.jpg "Difficult situation"
+[image7]: ./images/difficult_situation_track2_01.jpg "Difficult situation"
+[image12]: ./images/difficult_situation_track2_02.jpg "Difficult situation"
+[image13]: ./images/difficult_situation_track2_03.jpg "Difficult situation"
+[image14]: ./images/difficult_situation_track2_04.jpg "Difficult situation"
+[image8]: ./images/augmentation_example_01.jpg "Augmentation example"
+[image9]: ./images/augmentation_example_02.jpg "Augmentation example"
+[image10]: ./images/augmentation_example_03.jpg "Augmentation: flip"
 
 ## Rubric Points
 ### Here I will consider the [rubric points](https://review.udacity.com/#!/rubrics/432/view) individually and describe how I addressed each point in my implementation.  
@@ -118,6 +130,12 @@ To augment the data sat, I also flipped images and angles thinking that this wou
 
 ![alt text][image6]
 ![alt text][image7]
+![alt text][image8]
+![alt text][image9]
+![alt text][image10]
+![alt text][image14]
+![alt text][image12]
+![alt text][image13]
 
 Etc ....
 
