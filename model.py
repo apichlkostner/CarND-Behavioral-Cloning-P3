@@ -3,24 +3,46 @@ import cv2
 import numpy as np
 import pandas as pd
 
+# configuration
+HORIZON = 40    # horizon from top in pixels
+LOAD_MODEL = False
+BATCH_SIZE = 64
+EPOCHS     = 120
+SMALL_NET = True   # Use smaller fully connected layers
+TARGET_INPUT_SIZE = (100, 200, 3)
+# reversed for cv2
+TARGET_IMAGE_SIZE = (TARGET_INPUT_SIZE[1], TARGET_INPUT_SIZE[0])
+
 def process_image(img):
-    return cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+    """ preprocessing of the image """
+    img = cv2.resize(img, TARGET_IMAGE_SIZE)
+    img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+    return img
 
 class DriveImageGenerator:
-    augment_mult = 2
+    """ Image generator for Keras """
 
     def __init__(self):
         self.df_drive = {'train': None, 'valid': None}
         self.num_samples = {'train': 0, 'valid': 0}
         self.val_split = 0.0
         self.batch_size = 0
+        self.horizon = 0
 
     def shift_camera(self, img, horizon, shift):
+        """
+        Transforms the image as if the camera was shifted
+        
+        input: img - image to process
+               horizon - horizon in the image in pixels from top
+               shift - shift of the camera in pixels, positive to the right
+        """
         rows, cols, ch = img.shape
 
         # horizon is fix
         pts1 = np.float32([[0, 0], [cols, 0], [int(cols / 2),         rows - horizon]])
-        pts2 = np.float32([[0, 0], [cols, 0], [int(cols / 2) + shift, rows - horizon]])
+        # shift to the right -> points shift to the left
+        pts2 = np.float32([[0, 0], [cols, 0], [int(cols / 2) - shift, rows - horizon]])
 
         M = cv2.getAffineTransform(pts1, pts2)
 
@@ -28,9 +50,22 @@ class DriveImageGenerator:
 
         return img
 
-    def fit(self, logs, batch_size=32, val_split=0.2):
+    def fit(self, logs, batch_size=32, val_split=0.2, horizon=40):
+        """
+        Fits the generator to the data sets
+
+        input: logs - list of maps with logfiles
+                             'filename': filename of the csv
+                             'steeringCorrection': steering correction for left and right
+                                                   camera images. If 0 no augmentation
+                                                   should be done
+                batch_size - batch size
+                val_split - proportion of validation data (for split)
+                horizon - horizon of image in pixels from top
+        """
         self.batch_size = batch_size
-        
+        self.horizon = horizon
+
         df = pd.DataFrame()
 
         for logs in logs:
@@ -40,43 +75,42 @@ class DriveImageGenerator:
             # add column names
             temp_df.columns = ['center', 'left', 'right', 'steering', 'a', 'b', 'c']
 
+            # is steeringCorrection is zero the side cameras shouldn't be used
             useSideCameras = logs['steeringCorrection'] > 0.0
 
             # if side cameras shouldn't be used augmentation is also forbidden
             temp_df['augmentation'] = useSideCameras
 
-            cols_to_keep = ['center', 'steering', 'augmentation']
-
             # split data in center, left and right images
-            temp_df_center = temp_df[cols_to_keep].copy()
-            temp_df_left = temp_df[cols_to_keep].copy()
-            temp_df_right =temp_df[cols_to_keep].copy()
+            info_columns = ['steering', 'augmentation']
+            temp_df_center = temp_df[['center'] + info_columns].copy()
+            temp_df_left = temp_df[['left'] + info_columns].copy()
+            temp_df_right =temp_df[['right'] + info_columns].copy()
 
-            # create adjusted steering measurements for the side camera images
-            # track 2 needs larger value than track 1
-            
+            # create adjusted steering measurements for the side camera images            
             print('Reading logfile ' + logs['filename'])
             print('Correction factor = ' + str(logs['steeringCorrection']))
 
             temp_df_left['steering'] += logs['steeringCorrection']
             temp_df_right['steering'] -= logs['steeringCorrection']
 
+            # change names of columns
             cols_new = ['image', 'steering', 'augmentation']
 
             temp_df_center.columns = cols_new
             temp_df_left.columns = cols_new
             temp_df_right.columns = cols_new
 
+            # save samples from augmentation (debug)
             if False:
-                img_center = cv2.imread((temp_df_center.iloc[0])['image']).copy()
-                img_left = cv2.imread((temp_df_left.iloc[0])['image']).copy()
-                img_shift = self.shift_camera(img_center.copy(), 70, 30)
-                print("Write images...")
+                img_center = cv2.imread((temp_df_center.iloc[1])['image']).copy()
+                img_left = cv2.imread((temp_df_left.iloc[1])['image']).copy()
+                img_shift = self.shift_camera(img_center.copy(), 70, -60)
+                img_shift_middle = self.shift_camera(img_center.copy(), 70, -30)
                 cv2.imwrite('img_center.png', img_center)
                 cv2.imwrite('img_left.png', img_left)
                 cv2.imwrite('img_shift.png', img_shift)
-                print("Images written")
-            
+                cv2.imwrite('img_shift_middle.png', img_shift_middle)
 
             # append all images to one big data frame
             if useSideCameras:
@@ -84,8 +118,6 @@ class DriveImageGenerator:
             else:
                 df = df.append(temp_df_center)
 
-        print("Dataframe size = " + str(df.shape))
-        
         # random shuffle
         df = df.sample(frac=1).reset_index(drop=True)
 
@@ -96,10 +128,16 @@ class DriveImageGenerator:
         self.df_drive['valid'] = df[0:pos_split]
         
         self.num_samples = {'train': self.df_drive['train'].shape[0], 'valid': self.df_drive['valid'].shape[0]}
+        
         print('Number of samples: ' + str(self.num_samples))
 
     def flow(self, data_set_name):
-        X_data = np.zeros([self.batch_size, 160, 320, 3])
+        """
+        Generates batches in an endless loop
+
+        Input: data_set_name - name of dataset ('train' or 'valid')
+        """
+        X_data = np.zeros([self.batch_size, 100, 200, 3])
         y_data = np.zeros([self.batch_size])
         
         while 1:
@@ -130,12 +168,12 @@ class DriveImageGenerator:
                         shift = np.random.randint(0, 3)
 
                         if shift == 1:
-                            img = self.shift_camera(img, 70, -30)
-                            steering += 0.05
+                            img = self.shift_camera(img, self.horizon, -20)
+                            steering += 0.03
                         
                         if shift == 2:                
-                            img = self.shift_camera(img, 70, 30)
-                            steering -= 0.05
+                            img = self.shift_camera(img, self.horizon, 20)
+                            steering -= 0.03
 
                     X_data[sample] = img
                     y_data[sample] = steering
@@ -143,69 +181,94 @@ class DriveImageGenerator:
                 yield (X_data, y_data)
 
     def get_num_samples(self, data_set_name):
+        """
+        Get the number of samples
+
+        Input: data_set_name - name of dataset ('train' or 'valid')
+        """
         return self.num_samples[data_set_name]
 
-def get_model():
+
+def get_model(input_shape, horizon, small_net = True):
+    """
+    Creates a model
+
+    Input: input_shape - shape of the input image
+           horizon - horizon of images in pixels from top
+           small_net - if true only small fully connected layers are used
+    """
     from keras.models import Sequential
-    from keras.layers import Flatten, Dense, Conv2D, Dropout, Lambda, MaxPooling2D, Cropping2D, BatchNormalization
+    from keras.layers import Flatten, Dense, Conv2D, Dropout, Lambda, Cropping2D, BatchNormalization
     
     model = Sequential()
-    model.add(Lambda(lambda x: (x / 255.0) - 0.5, input_shape=(160,320,3)))
-    model.add(Cropping2D(cropping=((70, 25), (0, 0))))
+    model.add(Lambda(lambda x: (x / 255.0) - 0.5, input_shape = input_shape))
+    model.add(Cropping2D(cropping=((horizon, 16), (0, 0))))
     model.add(Conv2D(filters=24, kernel_size=[5,5] , strides=(2, 2), padding='valid', activation='relu'))
     model.add(BatchNormalization())
     model.add(Dropout(0.5))
     model.add(Conv2D(filters=36, kernel_size=[5,5] , strides=(2, 2), padding='valid', activation='relu'))
     model.add(BatchNormalization())
     model.add(Dropout(0.5))
-    model.add(Conv2D(filters=48, kernel_size=[5,5] , strides=(2, 2), padding='valid', activation='relu'))
+    model.add(Conv2D(filters=48, kernel_size=[5,5] , strides=(2, 2), padding='same', activation='relu'))
     model.add(BatchNormalization())
-    model.add(Conv2D(filters=64, kernel_size=[3,3] , strides=(1, 1), padding='valid', activation='relu'))
+    model.add(Conv2D(filters=64, kernel_size=[3,3] , strides=(1, 1), padding='same', activation='relu'))
     model.add(BatchNormalization())
-    model.add(Conv2D(filters=64, kernel_size=[3,3] , strides=(1, 1), padding='valid', activation='relu'))
+    model.add(Conv2D(filters=64, kernel_size=[3,3] , strides=(1, 1), padding='same', activation='relu'))
     model.add(BatchNormalization())
     model.add(Dropout(0.5))
 
-    model.add(Flatten())
-    model.add(Dense(200))
-    model.add(BatchNormalization())
-    model.add(Dropout(0.5))
-    model.add(Dense(50))
-    model.add(BatchNormalization())
-    model.add(Dropout(0.5))
-    model.add(Dense(30))
-    model.add(Dense(1))
+    if small_net:
+        # reduced fully connected layers
+        model.add(Flatten())
+        model.add(Dense(200))
+        model.add(BatchNormalization())
+        model.add(Dropout(0.5))
+        model.add(Dense(50))
+        model.add(BatchNormalization())
+        model.add(Dropout(0.5))
+        model.add(Dense(30))
+        model.add(Dense(1))
+    else:
+        # like in NVidia paper
+        model.add(Flatten())
+        model.add(Dense(1164))
+        model.add(BatchNormalization())
+        model.add(Dropout(0.5))
+        model.add(Dense(100))
+        model.add(BatchNormalization())
+        model.add(Dropout(0.5))
+        model.add(Dense(50))
+        model.add(BatchNormalization())
+        model.add(Dropout(0.5))
+        model.add(Dense(10))
+        model.add(Dense(1))
 
     model.compile(loss='mse', optimizer='adam')
 
     return model
 
 def main():
-    from keras.callbacks import ModelCheckpoint, EarlyStopping
+    from keras.callbacks import ModelCheckpoint, EarlyStopping, CSVLogger
     from keras.models import load_model
     
-    LOAD_MODEL = True
-
     if LOAD_MODEL:
         import keras.backend as K
 
-        model = load_model('model_track12_optimal_corr_10_12-0.0793.hdf5')
+        # load existing model and start with reduced learning rate
+        model = load_model('name.hdf5')
         K.set_value(model.optimizer.lr, 1e-04)
     else:
         # create model
-        model = get_model()
-
-    BATCH_SIZE = 64
-    EPOCHS     = 120
+        model = get_model(input_shape=TARGET_INPUT_SIZE, horizon=HORIZON, small_net=SMALL_NET)
 
     # reads images from disc and does on the fly augmentation
     dg = DriveImageGenerator()
 
     # log files
-    logs = [{'filename': '~/data/track_1/optimal_01/driving_log.csv', 'steeringCorrection': 0.15},
+    logs = [{'filename': '~/data/track_1/optimal_01/driving_log.csv', 'steeringCorrection': 0.1},
             {'filename': '~/data/track_1/critical_situations/driving_log.csv', 'steeringCorrection': 0.0},
             {'filename': '~/data/track_1/corrections_01/driving_log.csv', 'steeringCorrection': 0.0},
-            {'filename': '~/data/track_2/optimal_middle_01/driving_log.csv', 'steeringCorrection': 0.15},
+            {'filename': '~/data/track_2/optimal_middle_01/driving_log.csv', 'steeringCorrection': 0.1},
             {'filename': '~/data/track_2/critical_situations_middle_01/driving_log.csv', 'steeringCorrection': 0.0},
             {'filename': '~/data/track_2/critical_situations_middle_02/driving_log.csv', 'steeringCorrection': 0.0},
             {'filename': '~/data/track_2/corrections_middle_01/driving_log.csv', 'steeringCorrection': 0.0},
@@ -218,20 +281,25 @@ def main():
 
 
     # preprocessing of log files
-    dg.fit(logs=logs, batch_size = BATCH_SIZE)
+    dg.fit(logs=logs, batch_size=BATCH_SIZE)
 
     # number of steps for training and validation
     steps_train = int((dg.get_num_samples('train')) / BATCH_SIZE) + 1
     steps_valid = int((dg.get_num_samples('valid')) / BATCH_SIZE) + 1
 
+    name = 'model_small_04_horizon40'
+
+    # log history
+    historyLogger = CSVLogger('history/' + name + '.csv', append=True)
+
     # safe model checkpoints
-    modelCheckPoint = ModelCheckpoint('model_track12_optimal_corr_11_{epoch:02d}-{val_loss:.4f}.hdf5', monitor='val_loss', verbose=0, save_best_only=False)
+    modelCheckPoint = ModelCheckpoint('checkpoints/' + name + '_{epoch:02d}-{val_loss:.4f}.hdf5', monitor='val_loss', verbose=0, save_best_only=True)
 
     # stop training when validation loss is not decreasing
     earlyStopping = EarlyStopping(monitor='val_loss', min_delta=0, patience=30)
 
     # list with callbacks for fit_generator
-    callbacks = [modelCheckPoint, earlyStopping]
+    callbacks = [historyLogger, modelCheckPoint, earlyStopping]
 
     # fit model
     model.fit_generator(dg.flow('train'), steps_per_epoch = steps_train, 
