@@ -1,9 +1,25 @@
+[//]: # (Image References)
+
+[image1]: ./examples/placeholder.png "Model Visualization"
+[image2]: ./images/simulator_manual.jpg "Simulator manual"
+[image3]: ./images/simulator_autonomous.jpg "Simulator autonomous"
+[image4]: ./images/difficult_situation_track1_01.jpg "Difficult situation"
+[image5]: ./images/difficult_situation_track1_02.jpg "Difficult situation"
+[image6]: ./images/difficult_situation_track1_03.jpg "Difficult situation"
+[image7]: ./images/difficult_situation_track2_01.jpg "Difficult situation"
+[image12]: ./images/difficult_situation_track2_02.jpg "Difficult situation"
+[image13]: ./images/difficult_situation_track2_03.jpg "Difficult situation"
+[image14]: ./images/difficult_situation_track2_04.jpg "Difficult situation"
+[image8]: ./images/augmentation_example_01.jpg "Augmentation example"
+[image9]: ./images/augmentation_example_02.jpg "Augmentation example"
+[image10]: ./images/augmentation_example_03.jpg "Augmentation: flip"
+[image_plot_loss]: ./images/plot_loss.png "Plot loss"
+
 # **Behavioral Cloning** 
 
 # DRAFT DRAFT DRAFT
 
 This document is the writeup for an exercise of an online course.
-
 
 ---
 
@@ -21,72 +37,66 @@ The following steps were done:
 * Extra samples of critical situations were created by driving the simulator manually
 * A good working model was used to drive the simulator and videos of the result were recorded
 
+## Project files
 
-[//]: # (Image References)
+The project includes the following files:
+* model.py - creates and trains the model
+* drive.py - connects to the simulator and drives the car
+* model.h5 - contains the trained model
+* video.mp4 - the video of the autonomous drive in track 1
+* video_track2.mp4 - the video of the autonomous drive in track 2
+* README.md - this document
 
-[image1]: ./examples/placeholder.png "Model Visualization"
-[image2]: ./images/simulator_manual.jpg "Simulator manual"
-[image3]: ./images/simulator_autonomous.jpg "Simulator autonomous"
-[image4]: ./images/difficult_situation_track1_01.jpg "Difficult situation"
-[image5]: ./images/difficult_situation_track1_02.jpg "Difficult situation"
-[image6]: ./images/difficult_situation_track1_03.jpg "Difficult situation"
-[image7]: ./images/difficult_situation_track2_01.jpg "Difficult situation"
-[image12]: ./images/difficult_situation_track2_02.jpg "Difficult situation"
-[image13]: ./images/difficult_situation_track2_03.jpg "Difficult situation"
-[image14]: ./images/difficult_situation_track2_04.jpg "Difficult situation"
-[image8]: ./images/augmentation_example_01.jpg "Augmentation example"
-[image9]: ./images/augmentation_example_02.jpg "Augmentation example"
-[image10]: ./images/augmentation_example_03.jpg "Augmentation: flip"
+## Usage of the model and the simulator
 
-## Rubric Points
-### Here I will consider the [rubric points](https://review.udacity.com/#!/rubrics/432/view) individually and describe how I addressed each point in my implementation.  
+The python script drive.py can connect to the simulator and drive the car with
 
----
-### Files Submitted & Code Quality
-
-#### 1. Submission includes all required files and can be used to run the simulator in autonomous mode
-
-My project includes the following files:
-* model.py containing the script to create and train the model
-* drive.py for driving the car in autonomous mode
-* model.h5 containing a trained convolution neural network 
-* writeup_report.md or writeup_report.pdf summarizing the results
-
-#### 2. Submission includes functional code
-Using the Udacity provided simulator and my drive.py file, the car can be driven autonomously around the track by executing 
 ```sh
 python drive.py model.h5
 ```
 
-#### 3. Submission code is usable and readable
 
-The model.py file contains the code for training and saving the convolution neural network. The file shows the pipeline I used for training and validating the model, and it contains comments to explain how the code works.
+# Model Architecture and Training Strategy
 
-### Model Architecture and Training Strategy
+## Base model architecture
 
-#### 1. An appropriate model architecture has been employed
+The model is based on the work done by a team from NVidia [1].
 
-My model consists of a convolution neural network with 3x3 filter sizes and depths between 32 and 128 (model.py lines 18-24) 
+A new model is created with the function `get_model(input_shape, horizon, small_net = True)` (model.py, line 192).
 
-The model includes RELU layers to introduce nonlinearity (code line 20), and the data is normalized in the model using a Keras lambda layer (code line 18). 
+It consists of a convolutional neural network with kernel sizes of 3x3 and 5x5 and some fully connected layers.
 
-#### 2. Attempts to reduce overfitting in the model
+As activation functions 'RelU' is used, regularization is done with 'Dropout' and 'batch normalization' is done.
 
-The model contains dropout layers in order to reduce overfitting (model.py lines 21). 
+Since a relatively large neural network is done some measures to prevent overfitting are implemented:
 
-The model was trained and validated on different data sets to ensure that the model was not overfitting (code line 10-16). The model was tested by running it through the simulator and ensuring that the vehicle could stay on the track.
+* Dropout between the layers
+* Data augmentation
+    * Using left and right camera
+    * Virtual camera shift to the left and the right
+* Aquisition of many samples
+    * Aquisition of samples from different two tracks
+    * Driving the tracks two times in both directions
+    * Additional data aquisition for critical situations
 
-#### 3. Model parameter tuning
+To ensure that no overfitting occurs a train/validation split is done on the data with 80% training data and 20% validation data. Since the validation loss is lower than the training loss the measures against overfitting work.
 
-The model used an adam optimizer, so the learning rate was not tuned manually (model.py line 25).
+![Plot loss][image_plot_loss]
 
-#### 4. Appropriate training data
+The final test was done by driving the simulated car with the model and manually checking that the driving behavior is fine.
 
-Training data was chosen to keep the vehicle driving on the road. I used a combination of center lane driving, recovering from the left and right sides of the road ... 
+## Model parameter tuning
 
-For details about how I created the training data, see the next section. 
+The neural network is based on a network architecture which was used by a team from NVidia to drive a car in real world. Since for this work the model has simpler conditions in the simulator the big fully connected layers were reduced in size and one layer was removed. Both, the original model and the reduced model were trained and both show the same good driving behavior.
 
-### Model Architecture and Training Strategy
+The optimizer used was Adam so no extra parameter tuning was done.
+
+## Getting the training data
+
+Training data was produced by driving the simulator manually with a controller. Using the mouse was too difficult and using only the keyboard was not accurat enough.
+
+Both tracks of the simulator were used, in both two loops in both directions were driven. Additional corrections from wrong car trajectories were recorded and special situations like curves or difficult to detect situations on the tracks were used to have better data.
+
 
 #### 1. Solution Design Approach
 
@@ -145,3 +155,6 @@ After the collection process, I had X number of data points. I then preprocessed
 I finally randomly shuffled the data set and put Y% of the data into a validation set. 
 
 I used this training data for training the model. The validation set helped determine if the model was over or under fitting. The ideal number of epochs was Z as evidenced by ... I used an adam optimizer so that manually training the learning rate wasn't necessary.
+
+References:
+[1] http://images.nvidia.com/content/tegra/automotive/images/2016/solutions/pdf/end-to-end-dl-using-px.pdf
