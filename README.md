@@ -14,6 +14,8 @@
 [image9]: ./images/augmentation_example_02.jpg "Augmentation example"
 [image10]: ./images/augmentation_example_03.jpg "Augmentation: flip"
 [image_plot_loss]: ./images/plot_loss.png "Plot loss"
+[image_plot_loss_final]: ./images/plot_loss_final.png "Plot loss"
+[image_architecture]: ./images/architecture.png "Architecture"
 
 # **Behavioral Cloning** 
 
@@ -82,8 +84,9 @@ Since a relatively large neural network is done some measures to prevent overfit
 To ensure that no overfitting occurs a train/validation split is done on the data with 80% training data and 20% validation data. Since the validation loss is lower than the training loss the measures against overfitting work.
 
 ![Plot loss][image_plot_loss]
+![Plot loss][image_plot_loss_final]
 
-The final test was done by driving the simulated car with the model and manually checking that the driving behavior is fine.
+The final test was done by driving the simulated car with the model and manually checking that the driving behavior is fine. A separate test set wouldn't help since a low loss don't necessarily results in a model that can drive the car correctly.
 
 ## Model parameter tuning
 
@@ -120,7 +123,7 @@ The final model architecture (model.py lines 18-24) consisted of a convolution n
 
 Here is a visualization of the architecture (note: visualizing the architecture is optional according to the project rubric)
 
-![alt text][image1]
+![alt text][image_architecture]
 
 #### 3. Creation of the Training Set & Training Process
 
