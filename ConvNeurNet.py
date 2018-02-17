@@ -66,17 +66,30 @@ def get_model_functional(input_shape, horizon, small_net = True):
     # Flatten
     x = Flatten()(x)
 
-    # 3 dense layers with elu activation
-    x = Dense(200, activation='elu')(x)
-    x = BatchNormalization()(x)
-    x = Dropout(0.5)(x)
-    
-    x = Dense(50, activation='elu')(x)
-    x = BatchNormalization()(x)
-    x = Dropout(0.5)(x)
+    if small_net:
+        # 3 dense layers with elu activation
+        x = Dense(70, activation='elu')(x)
+        x = BatchNormalization()(x)
+        x = Dropout(0.5)(x)
 
-    x = Dense(30, activation='elu')(x)
-    x = BatchNormalization()(x)
+        x = Dense(30, activation='elu')(x)
+        x = BatchNormalization()(x)
+        x = Dropout(0.5)(x)
+
+        x = Dense(10, activation='elu')(x)
+        x = BatchNormalization()(x)
+    else:
+        # 3 dense layers with elu activation
+        x = Dense(200, activation='elu')(x)
+        x = BatchNormalization()(x)
+        x = Dropout(0.5)(x)
+    
+        x = Dense(50, activation='elu')(x)
+        x = BatchNormalization()(x)
+        x = Dropout(0.5)(x)
+
+        x = Dense(30, activation='elu')(x)
+        x = BatchNormalization()(x)
 
     # output with linear activation
     outputs = Dense(1)(x)

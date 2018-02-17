@@ -11,10 +11,11 @@ LOAD_MODEL = False
 LOAD_MODEL_NAME = 'name.hdf5'
 BATCH_SIZE = 64
 EPOCHS     = 120
-SMALL_NET = True   # Use smaller fully connected layers
+SMALL_NET = False   # Use smaller fully connected layers
+GET_MODEL = get_model_functional
 AUGMENTATION = True
 TARGET_INPUT_SIZE = (100, 200, 3)
-GET_MODEL = get_model_functional
+COLORSPACE = cv2.COLOR_BGR2RGB      # function for colorspace conversion
 # reversed for cv2
 TARGET_IMAGE_SIZE = (TARGET_INPUT_SIZE[1], TARGET_INPUT_SIZE[0])
 
@@ -51,19 +52,21 @@ def main():
     dg = DriveImageGenerator()
 
     # preprocessing of log files
-    dg.fit(logs=LOGS, batch_size=BATCH_SIZE, target_image_size=TARGET_IMAGE_SIZE, augmentation=AUGMENTATION)
+    dg.fit(logs=LOGS, batch_size=BATCH_SIZE, target_image_size=TARGET_IMAGE_SIZE,
+            augmentation=AUGMENTATION, colorspace=COLORSPACE)
 
     # number of steps for training and validation
     steps_train = int((dg.get_num_samples('train')) / BATCH_SIZE) + 1
     steps_valid = int((dg.get_num_samples('valid')) / BATCH_SIZE) + 1
 
-    name = 'model_func_02'
+    name = 'model_func_large_01'
 
     # log history
     historyLogger = CSVLogger('history/' + name + '.csv', append=True)
 
     # safe model checkpoints
-    modelCheckPoint = ModelCheckpoint('checkpoints/' + name + '_{epoch:02d}-{val_loss:.4f}.hdf5', monitor='val_loss', verbose=0, save_best_only=True)
+    modelCheckPoint = ModelCheckpoint('checkpoints/' + name + '_{epoch:02d}-{val_loss:.4f}.hdf5',
+                                        monitor='val_loss', verbose=0, save_best_only=True)
 
     # stop training when validation loss is not decreasing
     earlyStopping = EarlyStopping(monitor='val_loss', min_delta=0, patience=20)

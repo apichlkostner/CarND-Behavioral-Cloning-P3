@@ -46,9 +46,9 @@ class SimplePIController:
 
 
 controller = SimplePIController(0.1, 0.002)
-set_speed = 15
+set_speed = 30
 controller.set_desired(set_speed)
-
+COLOR_SPACE = 'rgb'
 
 @sio.on('telemetry')
 def telemetry(sid, data):
@@ -65,6 +65,8 @@ def telemetry(sid, data):
         image_array = np.asarray(image)
 
         img = cv2.resize(image_array, (200, 100))
+        if COLOR_SPACE == 'hsv':
+            img = cv2.cvtColor(img, cv2.COLOR_RGB2HSV)
 
         steering_angle = float(model.predict(img[None, :, :, :], batch_size=1))
 

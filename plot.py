@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 
-df = pd.read_csv('history/model_small_04_horizon40.csv')
+df = pd.read_csv('history/model_func_01.csv')
 
 df = df[1:]
 

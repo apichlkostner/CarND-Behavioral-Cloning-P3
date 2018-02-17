@@ -16,11 +16,12 @@ class DriveImageGenerator:
         self.horizon = 0
         self.target_image_size = (0, 0)
         self.augmentation = False
+        self.colorspace = cv2.COLOR_BGR2RGB
 
     def process_image(self, img):
         """ preprocessing of the image """
         img = cv2.resize(img, self.target_image_size)
-        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+        img = cv2.cvtColor(img, self.colorspace)
         return img
 
     def shift_camera(self, img, horizon, shift):
@@ -44,7 +45,8 @@ class DriveImageGenerator:
 
         return img
 
-    def fit(self, logs, batch_size=32, val_split=0.2, horizon=40, target_image_size=(100, 200), augmentation=True):
+    def fit(self, logs, batch_size=32, val_split=0.2, horizon=40, target_image_size=(100, 200),
+            augmentation=True, colorspace=cv2.COLOR_BGR2RGB):
         """
         Fits the generator to the data sets
 
@@ -61,6 +63,7 @@ class DriveImageGenerator:
         self.horizon = horizon
         self.target_image_size = target_image_size
         self.augmentation = augmentation
+        self.colorspace = colorspace
 
         df = pd.DataFrame()
         log_nr_counter = 0 # counter for saving sample images
@@ -110,7 +113,7 @@ class DriveImageGenerator:
                 cv2.imwrite('img_shift_middle03.png', img_shift_middle)
 
             log_nr_counter += 1
-            
+
             # append all images to one big data frame
             if useSideCameras:
                 df = df.append(temp_df_center).append(temp_df_left).append(temp_df_right)
