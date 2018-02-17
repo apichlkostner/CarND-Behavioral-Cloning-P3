@@ -116,7 +116,7 @@ The first try neural network was based on a network architecture which was used 
 
 A second architecture tested was Inception inspired but not so deep and with only 3x3 and 5x5 convolutions.
 Starting with only two convolutional layers with stride 2x2 the resulting network was very large because the size of the image was not enough reduced before the connection to the fully connected layers.
-So finally five convolutional layers were used with an output of 32@(1x22).
+So finally five convolutional layers were used with an output of 32@(1x21).
 Then the size of the fully connected layers was adapted to have a small net which still easy to train and which has a good driving behavior.
 
 The second architecture was much smaller than the first architecture but has even a better driving behavior in difficult situations (strong curves with shadow).
@@ -125,13 +125,13 @@ The second architecture was much smaller than the first architecture but has eve
 
 ## Final Model Architecture
 
-The final model architecture (model.py lines 18-24) consisted of a convolution neural network with the following layers:
+The final model architecture consisted of a convolution neural network with the following layers:
 
 ![Network architecture][image_architecture]
 
 ## Creation of the Training Set & Training Process
 
-To capture good driving behavior, first two laps of both tracks and in both direction were recorded. An example of track 1 is here:
+To capture good driving behavior, first two laps of both tracks and in both direction were recorded. An example of track one is here:
 
 ![Manual driving][simulator_manual]
 
@@ -154,7 +154,7 @@ For example an image of track one is show here:
 The bottom left image is the original image form the center camera, the top right image is from the left camera. The top left image is virtually shifted at the same position as the left camera. It can be seen that the lane marking is the same in the realy shifted and virtually shifted camera images. Bottom right is a only half shifted image.
 
 On the second track example the images at the top are from the center camera, the images at the bottom are from the left camera and in the middle the images are virtually shifted to the left (like in the left camera and only the half way).
-It can be seen the the lane marking in the really and virtually shifted images are at the same positons. Distortions on the virtually shifted images can be seen at the objects at the right of the street. This happens since the assumptions that all pixels are on a plae doesn't hold.
+It can be seen the the lane marking in the really and virtually shifted images are at the same positons. Distortions on the virtually shifted images can be seen at the objects at the right of the street. This happens since the assumptions that all pixels are on a plane doesn't hold.
 
 ![Flip][augmentation02]
 
