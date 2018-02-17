@@ -20,8 +20,6 @@
 
 # **Behavioral Cloning** 
 
-# DRAFT DRAFT DRAFT
-
 This document is the writeup for an exercise of an online course.
 
 ---
